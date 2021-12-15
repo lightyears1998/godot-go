@@ -24,6 +24,10 @@ config/name="Go"
 run/main_scene="res://screens/home_screen.tscn"
 config/icon="res://icon.png"
 
+[autoload]
+
+Util="*res://scripts/Util.gd"
+
 [display]
 
 window/size/width=1440
