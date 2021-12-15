@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://components/chessboard.gd" type="Script" id=1]
+
+[node name="Chessboard" type="Node2D"]
+position = Vector2( 10, 10 )
+script = ExtResource( 1 )

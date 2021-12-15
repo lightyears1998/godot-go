@@ -1,0 +1,25 @@
+[gd_scene load_steps=3 format=2]
+
+[ext_resource path="res://screens/home_screen.gd" type="Script" id=1]
+[ext_resource path="res://components/chessboard.tscn" type="PackedScene" id=2]
+
+[node name="HomeScreen" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource( 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Chessboard" parent="." instance=ExtResource( 2 )]
+
+[node name="Button" type="Button" parent="."]
+margin_left = 1117.0
+margin_top = 69.0
+margin_right = 1341.0
+margin_bottom = 138.0
+text = "Repent"
+__meta__ = {
+"_edit_use_anchors_": false
+}
