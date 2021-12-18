@@ -4,7 +4,10 @@ extends Node2D
 
 class_name Chessboard
 
-signal side_changed(new_side)
+signal side_changed()
+signal chess_had_not_placed(row_index, column_index, side, why)
+signal chess_placed(row_index, column_index, side)
+signal user_repented(restored_history_index)
 
 export(int) var chessboard_size = 880
 export(int) var chessboard_rows = 19
@@ -26,6 +29,9 @@ var placed_chesses = []
 
 var history = []
 
+func is_playing_through_network():
+	return get_tree().network_peer != null
+
 func is_valid_chess_index(row_index, column_index):
 	return row_index >= 0 && row_index < chessboard_rows && column_index >= 0 && column_index < chessboard_rows
 
@@ -44,6 +50,7 @@ func reset():
 	next_chess_side = 0
 	reset_placed_chesses()
 	history = []
+	update()
 
 func init_cross_points():
 	var columns = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"]
@@ -93,7 +100,7 @@ func _draw():
 		if mouse_hover_cross_point:
 			var row_index = mouse_hover_cross_point.row_index
 			var column_index = mouse_hover_cross_point.column_index
-			if !is_place_taken(row_index, column_index):
+			if !is_place_taken(placed_chesses, row_index, column_index):
 				draw_chess(row_index, column_index, user_side, 0.6)
 
 func draw_chess(row_index, column_index, side, chess_color_alpha = 1):
@@ -120,15 +127,35 @@ func _unhandled_input(event):
 					var row_index = nearest_cross_point["row_index"]
 					var column_index = nearest_cross_point["column_index"]
 					if user_side == next_chess_side:
-						if can_place_chess(row_index, column_index, next_chess_side):
-							place_chess(row_index, column_index, next_chess_side)
-							var dead_chesses = detect_dead_chesses_indexes()
-							for chess_index in dead_chesses:
-								remove_chess(chess_index.x, chess_index.y)
-							next_chess_side = 1 - next_chess_side
-							if switch_side_after_move:
-								switch_user_side()
-			update()
+						user_try_place_chess(row_index, column_index, user_side)
+		else:
+			mouse_hover_cross_point = null
+		update()
+
+func user_try_place_chess(row_index, column_index, side):
+	try_place_chess(row_index, column_index, side)
+	if is_playing_through_network():
+		rpc("try_place_chess", row_index, column_index, side)
+
+remote func try_place_chess(row_index, column_index, side):
+	var err = can_place_chess(row_index, column_index, next_chess_side)
+	if !err:
+		place_chess(row_index, column_index, next_chess_side)
+		var dead_chesses = detect_dead_chess_indexes(placed_chesses, side)
+		for chess_index in dead_chesses:
+			remove_chess(chess_index.x, chess_index.y)
+		next_chess_side = 1 - next_chess_side
+		if switch_side_after_move:
+			switch_user_side()
+		var record = {
+			"placed_chesses": placed_chesses.duplicate(true),
+			"last_move_by_side": side
+		}
+		history.push_back(record)
+		emit_signal("chess_placed", row_index, column_index, side)
+	else:
+		emit_signal("chess_had_not_placed", row_index, column_index, side, err)
+	update()
 
 func find_nearest_cross_point_and_distance(position):
 	var min_distance = chessboard_size
@@ -145,35 +172,58 @@ func find_nearest_cross_point_and_distance(position):
 		"cross_point": nearest_cross_point
 	}
 
-func is_place_taken(row_index, column_index):
-	return placed_chesses[row_index][column_index] != -1
+func is_place_taken(chesses, row_index, column_index):
+	return chesses[row_index][column_index] != -1
 
 func can_place_chess(row_index, column_index, side):
-	return !is_place_taken(row_index, column_index)
+	# Standard rule forbits placing stone over other stone
+	if is_place_taken(placed_chesses, row_index, column_index):
+		return "Place is already taken."
+	
+	# Standard rule forbits suicide.
+	var chesses = placed_chesses.duplicate(true)
+	chesses[row_index][column_index] = side
+	var dead_chess_indexes_after_play = detect_dead_chess_indexes(chesses, side)
+	for dead_chess_index in dead_chess_indexes_after_play:
+		if chesses[dead_chess_index.x][dead_chess_index.y] == side:
+			return "Suicide is not permitted."
+	remove_chesses(chesses, dead_chess_indexes_after_play)
+	
+	# Standard rule forbits the same situation come out once again.
+	for i in len(history):
+		if chesses == history[i]["placed_chesses"]:
+			return "Same situation happened in #%d, which is not permitted." % i
+	
+	return null
 
 func place_chess(row_index, column_index, side):
 	placed_chesses[row_index][column_index] = side
 
-func remove_chess(row_index, column_index, record_history = true):
+func remove_chess(row_index, column_index):
 	placed_chesses[row_index][column_index] = -1
 
-func detect_dead_chesses_indexes():
-	var dead_chesses_indexes = []
+func remove_chesses(chesses, dead_chess_indexes):
+	for index in dead_chess_indexes:
+		chesses[index.x][index.y] = -1
+	return chesses
+
+func detect_dead_chess_indexes(chesses, last_move_side):
+	var dead_chess_indexes = []
 
 	var visited_black = Util.new_2d_array(chessboard_rows, chessboard_rows, false)
 	var visited_white = Util.new_2d_array(chessboard_rows, chessboard_rows, false)
 	for i in chessboard_rows:
 		for j in chessboard_rows:
-			if is_place_taken(i, j):
+			if is_place_taken(chesses, i, j):
 				var visited
-				if placed_chesses[i][j] == 0:
+				if chesses[i][j] == 0:
 					visited = visited_black
 				else:
 					visited = visited_white
 				if visited[i][j]:
 					continue
 
-				var side = placed_chesses[i][j]
+				var side = chesses[i][j]
 				var liberty = 0
 				var group = []
 
@@ -183,10 +233,10 @@ func detect_dead_chesses_indexes():
 
 				while len(queue) > 0:
 					var current_place = queue.pop_front()
-					if !is_place_taken(current_place.x, current_place.y):
+					if !is_place_taken(chesses, current_place.x, current_place.y):
 						liberty += 1
 						visited_empty.push_back(current_place)
-					elif side == placed_chesses[current_place.x][current_place.y]:
+					elif side == chesses[current_place.x][current_place.y]:
 						group.push_back(current_place)
 						for d in [[1, 0], [-1, 0], [0, 1], [0, -1]]:
 							var dx = d[0]
@@ -200,14 +250,34 @@ func detect_dead_chesses_indexes():
 				for place in visited_empty:
 					visited[place.x][place.y] = false
 				if liberty == 0:
-					dead_chesses_indexes.append_array(group)
-	return dead_chesses_indexes
+					dead_chess_indexes.append_array(group)
+					
+	var opponent_side = 1 - last_move_side
+	var at_least_one_oppoent_chess_died = false
+	for chess_index in dead_chess_indexes:
+		if chesses[chess_index.x][chess_index.y] == opponent_side:
+			at_least_one_oppoent_chess_died = true
+			break
+	if at_least_one_oppoent_chess_died:
+		var opponent_dead_chess_indexes = []
+		for index in dead_chess_indexes:
+			if chesses[index.x][index.y] == opponent_side:
+				opponent_dead_chess_indexes.push_back(index)
+		dead_chess_indexes = opponent_dead_chess_indexes
+	return dead_chess_indexes
 
 func repent():
-	var last_move = history.pop_back()
-	if last_move:
-		last_move["place"]
+	var last_record = history.pop_back()
+	if last_record && last_record["last_move_by_side"] == user_side:
+		last_record = history.pop_back()
+	if last_record:
+		placed_chesses = last_record["placed_chesses"]
+		next_chess_side = 1 - last_record["last_move_by_side"]
+	else:
+		reset()
+	emit_signal("user_repented", len(history))
+	update()
 
 func switch_user_side():
 	user_side = 1 - user_side
-	emit_signal("side_changed", user_side)
+	emit_signal("side_changed")

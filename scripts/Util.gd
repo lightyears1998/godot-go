@@ -13,3 +13,6 @@ static func new_2d_array(shape0: int, shape1: int, initial_value):
 		for j in shape1:
 			arr[i][j] = initial_value
 	return arr
+
+static func clone(data):
+	return bytes2var(var2bytes(data)) 
