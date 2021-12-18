@@ -4,10 +4,10 @@ extends Node2D
 
 class_name Chessboard
 
-signal side_changed()
+signal side_switched()
 signal chess_had_not_placed(row_index, column_index, side, why)
 signal chess_placed(row_index, column_index, side)
-signal user_repented(restored_history_index)
+signal repented(restored_history_index)
 
 export(int) var chessboard_size = 880
 export(int) var chessboard_rows = 19
@@ -23,6 +23,7 @@ var user_side = 0
 var switch_side_after_move = false
 
 var chess_colors = [ColorN("black"), ColorN("white")]
+
 var next_chess_side = 0
 
 var placed_chesses = []
@@ -51,6 +52,17 @@ func reset():
 	reset_placed_chesses()
 	history = []
 	update()
+
+func request_synchronization():
+	rpc("send_synchronization")
+
+remote func send_synchronization():
+	rpc("receive_synchronization", next_chess_side, placed_chesses, history)
+
+remote func receive_synchronization(next_chess_side, placed_chesses, history):
+	self.next_chess_side = next_chess_side
+	self.placed_chesses = placed_chesses
+	self.history = history
 
 func init_cross_points():
 	var columns = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"]
@@ -140,13 +152,13 @@ func user_try_place_chess(row_index, column_index, side):
 remote func try_place_chess(row_index, column_index, side):
 	var err = can_place_chess(row_index, column_index, next_chess_side)
 	if !err:
-		place_chess(row_index, column_index, next_chess_side)
+		place_chess(placed_chesses, row_index, column_index, next_chess_side)
 		var dead_chesses = detect_dead_chess_indexes(placed_chesses, side)
 		for chess_index in dead_chesses:
-			remove_chess(chess_index.x, chess_index.y)
+			remove_chess(placed_chesses, chess_index.x, chess_index.y)
 		next_chess_side = 1 - next_chess_side
 		if switch_side_after_move:
-			switch_user_side()
+			switch_side()
 		var record = {
 			"placed_chesses": placed_chesses.duplicate(true),
 			"last_move_by_side": side
@@ -176,11 +188,11 @@ func is_place_taken(chesses, row_index, column_index):
 	return chesses[row_index][column_index] != -1
 
 func can_place_chess(row_index, column_index, side):
-	# Standard rule forbits placing stone over other stone
+	# standard rule forbits placing stone over other stone
 	if is_place_taken(placed_chesses, row_index, column_index):
 		return "Place is already taken."
 	
-	# Standard rule forbits suicide.
+	# standard rule forbits suicide.
 	var chesses = placed_chesses.duplicate(true)
 	chesses[row_index][column_index] = side
 	var dead_chess_indexes_after_play = detect_dead_chess_indexes(chesses, side)
@@ -189,18 +201,18 @@ func can_place_chess(row_index, column_index, side):
 			return "Suicide is not permitted."
 	remove_chesses(chesses, dead_chess_indexes_after_play)
 	
-	# Standard rule forbits the same situation come out once again.
+	# standard rule forbits the same situation come out once again.
 	for i in len(history):
 		if chesses == history[i]["placed_chesses"]:
 			return "Same situation happened in #%d, which is not permitted." % i
 	
 	return null
 
-func place_chess(row_index, column_index, side):
-	placed_chesses[row_index][column_index] = side
+func place_chess(chesses, row_index, column_index, side):
+	chesses[row_index][column_index] = side
 
-func remove_chess(row_index, column_index):
-	placed_chesses[row_index][column_index] = -1
+func remove_chess(chesses, row_index, column_index):
+	chesses[row_index][column_index] = -1
 
 func remove_chesses(chesses, dead_chess_indexes):
 	for index in dead_chess_indexes:
@@ -266,18 +278,24 @@ func detect_dead_chess_indexes(chesses, last_move_side):
 		dead_chess_indexes = opponent_dead_chess_indexes
 	return dead_chess_indexes
 
-func repent():
+func user_repent():
+	repent()
+	if is_playing_through_network():
+		rpc("repent")
+
+remote func repent():
 	var last_record = history.pop_back()
-	if last_record && last_record["last_move_by_side"] == user_side:
-		last_record = history.pop_back()
 	if last_record:
 		placed_chesses = last_record["placed_chesses"]
 		next_chess_side = 1 - last_record["last_move_by_side"]
 	else:
 		reset()
-	emit_signal("user_repented", len(history))
+	emit_signal("repented", len(history))
 	update()
 
-func switch_user_side():
+func user_switch_side():
+	switch_side()
+
+func switch_side():
 	user_side = 1 - user_side
-	emit_signal("side_changed")
+	emit_signal("side_switched")

@@ -21,7 +21,7 @@ _global_script_class_icons={
 [application]
 
 config/name="Go"
-run/main_scene="res://screens/home_screen.tscn"
+run/main_scene="res://screens/battle_screen.tscn"
 config/icon="res://icon.png"
 
 [autoload]
