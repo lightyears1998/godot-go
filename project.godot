@@ -13,9 +13,21 @@ _global_script_classes=[ {
 "class": "Chessboard",
 "language": "GDScript",
 "path": "res://components/chessboard.gd"
+}, {
+"base": "Reference",
+"class": "Coordinate",
+"language": "GDScript",
+"path": "res://objects/coordinate.gd"
+}, {
+"base": "Reference",
+"class": "Stone",
+"language": "GDScript",
+"path": "res://objects/stone.gd"
 } ]
 _global_script_class_icons={
-"Chessboard": ""
+"Chessboard": "",
+"Coordinate": "",
+"Stone": ""
 }
 
 [application]

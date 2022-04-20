@@ -5,26 +5,28 @@ extends Node2D
 class_name Chessboard
 
 signal side_switched()
-signal chess_had_not_placed(row_index, column_index, side, why)
+signal chess_cannot_placed(row_index, column_index, side, why)
 signal chess_placed(row_index, column_index, side)
 signal repented(restored_history_index)
 
-export(int) var chessboard_size = 880
+var Stone = preload("res://objects/stone.gd")
+
+export(int) var chessboard_pixel_size = 880
 export(int) var chessboard_rows = 19
 export(Color) var chessboard_color = Color("f0d887")
 
-var gap_width = chessboard_size / (chessboard_rows + 1)
-var chess_radius = gap_width / 2.2
+var gap_pixel_width = chessboard_pixel_size / (chessboard_rows + 1)
+var chess_pixel_radius = gap_pixel_width / 2.2
 var cross_points = []
 
 var mouse_hover_cross_point = null
 
-var user_side = 0
+var user_side = Stone.Sides.BLACK
 var switch_side_after_move = false
 
 var chess_colors = [ColorN("black"), ColorN("white")]
 
-var next_chess_side = 0
+var next_chess_side = Stone.Sides.BLACK
 
 var placed_chesses = []
 
@@ -39,8 +41,8 @@ func is_valid_chess_index(row_index, column_index):
 func toggle_switch_side_after_move():
 	switch_side_after_move = !switch_side_after_move
 
-func get_position_vector_from_index(row_index, column_index):
-	return Vector2((column_index + 1) * gap_width, (row_index + 1) * gap_width)
+func get_pixel_position_vector_from_index(row_index, column_index):
+	return Vector2((column_index + 1) * gap_pixel_width, (row_index + 1) * gap_pixel_width)
 
 func _init():
 	init_cross_points()
@@ -65,18 +67,13 @@ remote func receive_synchronization(next_chess_side, placed_chesses, history):
 	self.history = history
 
 func init_cross_points():
-	var columns = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T"]
 	for i in range(1, 20):
 		for j in range(1, 20):
-			var row = str(20 - i)
-			var column = columns[j-1]
 			var row_index = i - 1
 			var column_index = j - 1
-			var position = get_position_vector_from_index(row_index, column_index)
+			var position = get_pixel_position_vector_from_index(row_index, column_index)
 			cross_points.push_back({
-				"row": row,
-				"column": column,
-				"position": position,
+				"pixel_position": position,
 				"row_index": row_index,
 				"column_index": column_index
 			})
@@ -86,26 +83,26 @@ func reset_placed_chesses():
 
 func _draw():
 	# draw background
-	draw_rect(Rect2(0, 0, chessboard_size, chessboard_size), chessboard_color)
+	draw_rect(Rect2(0, 0, chessboard_pixel_size, chessboard_pixel_size), chessboard_color)
 
 	# draw cross lines
 	for i in range(1, 20):
-		draw_line(Vector2(gap_width, i * gap_width), Vector2(chessboard_size - gap_width, i * gap_width), ColorN("black"))
-		draw_line(Vector2(i * gap_width, gap_width), Vector2(i * gap_width, chessboard_size - gap_width), ColorN("black"))
+		draw_line(Vector2(gap_pixel_width, i * gap_pixel_width), Vector2(chessboard_pixel_size - gap_pixel_width, i * gap_pixel_width), ColorN("black"))
+		draw_line(Vector2(i * gap_pixel_width, gap_pixel_width), Vector2(i * gap_pixel_width, chessboard_pixel_size - gap_pixel_width), ColorN("black"))
 
 	# draw special cross points
 	for i in 3:
 		for j in 3:
 			var x = 3 + i * 6
 			var y = 3 + j * 6
-			var v = get_position_vector_from_index(x, y)
+			var v = get_pixel_position_vector_from_index(x, y)
 			draw_circle(v, 4, ColorN("black"))
 
 	# draw placed chess
 	for i in chessboard_rows:
 		for j in chessboard_rows:
 			if placed_chesses[i][j] != -1:
-				draw_chess(i, j, placed_chesses[i][j])
+				_draw_chess(i, j, placed_chesses[i][j])
 
 	# draw mouse-hover chess
 	if next_chess_side == user_side:
@@ -113,23 +110,23 @@ func _draw():
 			var row_index = mouse_hover_cross_point.row_index
 			var column_index = mouse_hover_cross_point.column_index
 			if !is_place_taken(placed_chesses, row_index, column_index):
-				draw_chess(row_index, column_index, user_side, 0.6)
+				_draw_chess(row_index, column_index, user_side, 0.6)
 
-func draw_chess(row_index, column_index, side, chess_color_alpha = 1):
-	var position = get_position_vector_from_index(row_index, column_index)
+func _draw_chess(row_index, column_index, side, chess_color_alpha = 1):
+	var position = get_pixel_position_vector_from_index(row_index, column_index)
 	var color = chess_colors[side]
 	color.a = chess_color_alpha
-	draw_circle(position, chess_radius, color)
+	draw_circle(position, chess_pixel_radius, color)
 
 func _unhandled_input(event):
 	if event is InputEventMouse:
 		var position = make_input_local(event).position
-		if position.x >= 0 && position.y >= 0 && position.x <= chessboard_size && position.y <= chessboard_size:
+		if position.x >= 0 && position.y >= 0 && position.x <= chessboard_pixel_size && position.y <= chessboard_pixel_size:
 			var nearest_cross_point_and_distance = find_nearest_cross_point_and_distance(position)
 			var distance = nearest_cross_point_and_distance["distance"]
 			var nearest_cross_point = nearest_cross_point_and_distance["cross_point"]
 
-			if distance < chess_radius:
+			if distance < chess_pixel_radius:
 				mouse_hover_cross_point = nearest_cross_point
 			else:
 				mouse_hover_cross_point = null
@@ -166,15 +163,15 @@ remote func try_place_chess(row_index, column_index, side):
 		history.push_back(record)
 		emit_signal("chess_placed", row_index, column_index, side)
 	else:
-		emit_signal("chess_had_not_placed", row_index, column_index, side, err)
+		emit_signal("chess_cannot_placed", row_index, column_index, side, err)
 	update()
 
 func find_nearest_cross_point_and_distance(position):
-	var min_distance = chessboard_size
+	var min_distance = chessboard_pixel_size
 	var nearest_cross_point = cross_points[0]
 
 	for cross_point in cross_points:
-		var current_distance = position.distance_to(cross_point.position)
+		var current_distance = position.distance_to(cross_point.pixel_position)
 		if current_distance < min_distance:
 			min_distance = current_distance
 			nearest_cross_point = cross_point
@@ -191,7 +188,7 @@ func can_place_chess(row_index, column_index, side):
 	# standard rule forbits placing stone over other stone
 	if is_place_taken(placed_chesses, row_index, column_index):
 		return "Place is already taken."
-	
+
 	# standard rule forbits suicide.
 	var chesses = placed_chesses.duplicate(true)
 	chesses[row_index][column_index] = side
@@ -200,12 +197,12 @@ func can_place_chess(row_index, column_index, side):
 		if chesses[dead_chess_index.x][dead_chess_index.y] == side:
 			return "Suicide is not permitted."
 	remove_chesses(chesses, dead_chess_indexes_after_play)
-	
+
 	# standard rule forbits the same situation come out once again.
 	for i in len(history):
 		if chesses == history[i]["placed_chesses"]:
 			return "Same situation happened in #%d, which is not permitted." % i
-	
+
 	return null
 
 func place_chess(chesses, row_index, column_index, side):
@@ -263,7 +260,7 @@ func detect_dead_chess_indexes(chesses, last_move_side):
 					visited[place.x][place.y] = false
 				if liberty == 0:
 					dead_chess_indexes.append_array(group)
-					
+
 	var opponent_side = 1 - last_move_side
 	var at_least_one_oppoent_chess_died = false
 	for chess_index in dead_chess_indexes:

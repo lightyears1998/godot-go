@@ -2,6 +2,10 @@ tool
 
 extends Node
 
+static func make_pass():
+	var Coordinate = preload("res://objects/coordinate.gd")
+	return Coordinate.new(-1, -1)
+
 static func new_2d_array(shape0: int, shape1: int, initial_value):
 	assert(shape0 >= 0)
 	assert(shape1 >= 0)

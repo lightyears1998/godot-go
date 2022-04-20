@@ -9,19 +9,19 @@ var mode = null
 
 func _ready():
 	setup_network_callbacks()
-	connect_chessboard()
+	connect_components()
 
 func setup_network_callbacks():
-	get_tree().connect("network_peer_connected", self, "_player_connected")
-	get_tree().connect("network_peer_disconnected", self, "_player_disconnected")
-	get_tree().connect("connected_to_server", self, "_connected_ok")
-	get_tree().connect("connection_failed", self, "_connected_fail")
-	get_tree().connect("server_disconnected", self, "_server_disconnected")
+	get_tree().connect("network_peer_connected", self, "_on_player_connected")
+	get_tree().connect("network_peer_disconnected", self, "_on_player_disconnected")
+	get_tree().connect("connected_to_server", self, "_on_connection_ok")
+	get_tree().connect("connection_failed", self, "_on_connection_failed")
+	get_tree().connect("server_disconnected", self, "_on_server_disconnected")
 
-func connect_chessboard():
+func connect_components():
 	$Chessboard.connect("side_switched", self, "_on_side_changed")
 	$Chessboard.connect("chess_placed", self, "_on_chess_placed")
-	$Chessboard.connect("chess_had_not_placed", self, "_on_chess_had_not_placed")
+	$Chessboard.connect("chess_cannot_placed", self, "_on_chess_cannot_placed")
 	$HostButton.connect("pressed", self, "host")
 	$ConnectButton.connect("pressed", self, "connect_to_host_or_disconnect")
 	$RepentButton.connect("pressed", $Chessboard, "user_repent")
@@ -42,7 +42,7 @@ func _on_send_chat_button_pressed():
 func _on_chess_placed(row_index, column_index, side):
 	print_log("%s plays at (%s, %s)" % [SIDES[side], row_index, column_index])
 
-func _on_chess_had_not_placed(row_index, column_index, side, why):
+func _on_chess_cannot_placed(row_index, column_index, side, why):
 	print_log("%s cannot play at (%s, %s): %s" % [SIDES[side], row_index, column_index, why])
 
 func update_side_label():
@@ -55,22 +55,22 @@ func print_log(text):
 	$ChatLabel.add_text(text)
 	$ChatLabel.newline()
 
-func _player_connected(id):
+func _on_player_connected(id):
 	print_log("Player connected: %s" % id)
 
-func _player_disconnected(id):
+func _on_player_disconnected(id):
 	print_log("Player disconnected: %s" % id)
 
-func _connected_ok():
+func _on_connection_ok():
 	print_log("Connection ok.")
 	if mode == "Client":
 		$Chessboard.request_synchronization()
 		print_log("Chessboard is syncing from host.")
 
-func _server_disconnected():
+func _on_server_disconnected():
 	print_log("Server disconnected.")
 
-func _connected_fail():
+func _on_connected_failed():
 	print_log("Connection failed.")
 
 func host():

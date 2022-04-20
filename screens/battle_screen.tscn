@@ -65,6 +65,16 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
+[node name="PassButton" type="Button" parent="."]
+margin_left = 1216.0
+margin_top = 791.0
+margin_right = 1408.0
+margin_bottom = 855.0
+text = "Pass"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
 [node name="ResetButton" type="Button" parent="."]
 margin_left = 1216.0
 margin_top = 224.0
