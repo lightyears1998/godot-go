@@ -25,6 +25,7 @@ func connect_components():
 	$HostButton.connect("pressed", self, "host")
 	$ConnectButton.connect("pressed", self, "connect_to_host_or_disconnect")
 	$RepentButton.connect("pressed", $Chessboard, "user_repent")
+	$Chessboard.connect("user_cannot_repent", self, "_on_fail_to_repent")
 	$SyncButton.connect("pressed", $Chessboard, "send_synchronization")
 	$SwitchSideButton.connect("pressed", $Chessboard, "user_switch_side")
 	$AutoSwitchSideCheckBox.connect("pressed", $Chessboard, "toggle_switch_side_after_move")
@@ -72,6 +73,9 @@ func _on_server_disconnected():
 
 func _on_connected_failed():
 	print_log("Connection failed.")
+
+func _on_fail_to_repent(why):
+	print_log(why)
 
 func host():
 	if mode == null:

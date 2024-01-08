@@ -65,6 +65,16 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
+[node name="ExportHistoryButton" type="Button" parent="."]
+margin_left = 1216.0
+margin_top = 320.0
+margin_right = 1408.0
+margin_bottom = 384.0
+text = "Export"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
 [node name="PassButton" type="Button" parent="."]
 margin_left = 1216.0
 margin_top = 791.0

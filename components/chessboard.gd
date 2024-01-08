@@ -4,12 +4,13 @@ extends Node2D
 
 class_name Chessboard
 
+var Stone = preload("res://objects/stone.gd")
+
 signal side_switched()
 signal chess_cannot_placed(row_index, column_index, side, why)
 signal chess_placed(row_index, column_index, side)
+signal user_cannot_repent(why)
 signal repented(restored_history_index)
-
-var Stone = preload("res://objects/stone.gd")
 
 export(int) var chessboard_pixel_size = 880
 export(int) var chessboard_rows = 19
@@ -30,7 +31,8 @@ var next_chess_side = Stone.Sides.BLACK
 
 var placed_chesses = []
 
-var history = []
+var placed_chesses_history = []
+var move_history = []
 
 func is_playing_through_network():
 	return get_tree().network_peer != null
@@ -52,19 +54,21 @@ func reset():
 	mouse_hover_cross_point = null
 	next_chess_side = 0
 	reset_placed_chesses()
-	history = []
+	placed_chesses_history = []
+	move_history = []
 	update()
 
 func request_synchronization():
 	rpc("send_synchronization")
 
 remote func send_synchronization():
-	rpc("receive_synchronization", next_chess_side, placed_chesses, history)
+	rpc("receive_synchronization", next_chess_side, placed_chesses, placed_chesses_history, move_history)
 
-remote func receive_synchronization(next_chess_side, placed_chesses, history):
+remote func receive_synchronization(next_chess_side, placed_chesses, placed_chesses_history, move_history):
 	self.next_chess_side = next_chess_side
 	self.placed_chesses = placed_chesses
-	self.history = history
+	self.placed_chesses_history = placed_chesses_history
+	self.move_history = move_history
 
 func init_cross_points():
 	for i in range(1, 20):
@@ -104,6 +108,9 @@ func _draw():
 			if placed_chesses[i][j] != -1:
 				_draw_chess(i, j, placed_chesses[i][j])
 
+	# draw emphasis mark
+	
+
 	# draw mouse-hover chess
 	if next_chess_side == user_side:
 		if mouse_hover_cross_point:
@@ -117,6 +124,12 @@ func _draw_chess(row_index, column_index, side, chess_color_alpha = 1):
 	var color = chess_colors[side]
 	color.a = chess_color_alpha
 	draw_circle(position, chess_pixel_radius, color)
+
+func _draw_emphasis_mark(row_index, column_index, side):
+	var position = get_pixel_position_vector_from_index(row_index, column_index)
+	var color = chess_colors[side]
+	color.a = 0.8
+	draw_circle(position, chess_pixel_radius * 0.2, color)
 
 func _unhandled_input(event):
 	if event is InputEventMouse:
@@ -160,7 +173,8 @@ remote func try_place_chess(row_index, column_index, side):
 			"placed_chesses": placed_chesses.duplicate(true),
 			"last_move_by_side": side
 		}
-		history.push_back(record)
+		placed_chesses_history.push_back(record)
+		move_history.push_back([side, row_index, column_index])
 		emit_signal("chess_placed", row_index, column_index, side)
 	else:
 		emit_signal("chess_cannot_placed", row_index, column_index, side, err)
@@ -199,8 +213,8 @@ func can_place_chess(row_index, column_index, side):
 	remove_chesses(chesses, dead_chess_indexes_after_play)
 
 	# standard rule forbits the same situation come out once again.
-	for i in len(history):
-		if chesses == history[i]["placed_chesses"]:
+	for i in len(placed_chesses_history):
+		if chesses == placed_chesses_history[i]["placed_chesses"]:
 			return "Same situation happened in #%d, which is not permitted." % i
 
 	return null
@@ -276,18 +290,27 @@ func detect_dead_chess_indexes(chesses, last_move_side):
 	return dead_chess_indexes
 
 func user_repent():
+	if next_chess_side != user_side:
+		emit_signal("user_cannot_repent", "Could not repent: not your turn.")
+		return
+		
 	repent()
 	if is_playing_through_network():
 		rpc("repent")
 
 remote func repent():
-	var last_record = history.pop_back()
+	placed_chesses_history.pop_back()
+	move_history.pop_back()
+	
+	var last_record = placed_chesses_history.pop_back()
+	move_history.pop_back()
+	
 	if last_record:
 		placed_chesses = last_record["placed_chesses"]
 		next_chess_side = 1 - last_record["last_move_by_side"]
 	else:
 		reset()
-	emit_signal("repented", len(history))
+	emit_signal("repented", len(placed_chesses_history))
 	update()
 
 func user_switch_side():

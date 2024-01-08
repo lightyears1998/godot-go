@@ -2,7 +2,7 @@
 
 ## Relative Resources
 
-- AlphaGo's Games in SGW Format <https://www.alphago-games.com/>
+- [AlphaGo's Games in SGW Format](https://www.alphago-games.com/)
 
 ## Standards
 
